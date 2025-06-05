@@ -1,0 +1,39 @@
+/* Basic styling for tab content visibility if needed, though WP handles tabs well */
+.aipu-dashboard-wrap .nav-tab-wrapper {
+    margin-bottom: 20px;
+}
+.aipu-tab-content {
+    /* Add styles for tab content sections if needed */
+}
+.aipu-logs-container ul {
+    list-style-type: none;
+    padding-left: 0;
+}
+ .aipu-logs-container li {
+    padding: 5px 0;
+    border-bottom: 1px dotted #eee;
+}
+
+/* Styles for Broken Links Table */
+.wp-list-table th, .wp-list-table td {
+    overflow: hidden; /* Helps with long URLs/text */
+    text-overflow: ellipsis;
+    /* white-space: nowrap; /* Could be too restrictive */
+}
+.wp-list-table td a {
+    /* display: inline-block; */ /* if trimming is too aggressive */
+    /* max-width: 100%; */
+}
+/* Ensure pagination links are styled like default WP pagination if not already */
+.tablenav-pages a, .tablenav-pages span.current {
+    padding: 6px 10px;
+    text-decoration: none;
+    border: 1px solid #ccc;
+    margin-left: 3px;
+    margin-right: 3px;
+    border-radius: 3px;
+}
+.tablenav-pages span.current {
+    background-color: #f0f0f0;
+    font-weight: bold;
+}

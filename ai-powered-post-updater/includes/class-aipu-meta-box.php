@@ -21,6 +21,7 @@ class AIPU_Meta_Box {
         add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_scripts' ] );
         // Action for handling the indexing request
         add_action( 'wp_ajax_aipu_request_indexing', [ $this, 'handle_ajax_request_indexing' ] );
+        add_action( 'wp_ajax_aipu_recheck_post_links_action', [ $this, 'handle_ajax_recheck_post_links' ] );
     }
 
     public function enqueue_scripts( $hook ) {
@@ -137,6 +138,44 @@ class AIPU_Meta_Box {
         echo '<button type="button" id="aipu-request-google-indexing" class="button button-primary">Request Google Indexing</button>';
         echo '<p id="aipu-indexing-status" style="margin-top:10px;"></p>';
 
+        // --- Section: Link Health ---
+        echo '<h3><span class="dashicons dashicons-search"></span> Link Health</h3>';
+        $broken_links_data = get_post_meta( $post->ID, AIPU_Broken_Link_Checker::POST_META_KEY_BROKEN_LINKS, true );
+        if ( !empty($broken_links_data) && is_array($broken_links_data) ) {
+            echo '<h4>' . __('Broken Links Found in this Post:', 'ai-powered-post-updater') . '</h4>';
+            echo '<ul>';
+            foreach (array_slice($broken_links_data, 0, 5) as $link) { // Show first 5
+                echo '<li><a href="' . esc_url($link['url']) . '" target="_blank">' . esc_html(wp_trim_words($link['url'], 8)) . '</a> (' . esc_html($link['status']) . ') - Anchor: ' . esc_html(wp_trim_words($link['anchor'], 5)) . '</li>';
+            }
+            echo '</ul>';
+            if (count($broken_links_data) > 5) {
+                echo '<p>' . sprintf(__('And %d more...', 'ai-powered-post-updater'), count($broken_links_data) - 5) . '</p>';
+            }
+            echo '<p><a href="' . esc_url(admin_url('admin.php?page=aipu-dashboard&tab=broken_links')) . '">' . __('View full report & manage links', 'ai-powered-post-updater') . '</a></p>';
+        } else {
+            $dashboard_settings = get_option(AIPU_Admin_Dashboard::DASHBOARD_SETTINGS_OPTION_KEY, []);
+            $blc_enabled = !empty($dashboard_settings['enable_broken_link_checker']);
+            if ($blc_enabled) {
+               echo '<p>' . __('No broken links detected in this post by the last scan.', 'ai-powered-post-updater') . '</p>';
+            } else {
+               echo '<p>' . __('Broken Link Checker feature is currently disabled in global settings.', 'ai-powered-post-updater') . '</p>';
+            }
+        }
+        echo '<button type="button" id="aipu-recheck-post-links" class="button button-secondary" data-postid="' . esc_attr($post->ID) . '">' . __('Re-scan Links in this Post', 'ai-powered-post-updater') . '</button>';
+        echo '<span id="aipu-recheck-status" style="margin-left:10px;"></span>';
+
+
+        // --- Section: Automated Internal Linking Info ---
+        $dashboard_settings_ail = get_option(AIPU_Admin_Dashboard::DASHBOARD_SETTINGS_OPTION_KEY, []);
+        $auto_linking_enabled = !empty($dashboard_settings_ail['enable_auto_internal_linking']);
+        echo '<h3><span class="dashicons dashicons-admin-links"></span> Automated Internal Linking</h3>';
+        if ($auto_linking_enabled) {
+            $max_links = isset($dashboard_settings_ail['max_links_per_post']) ? intval($dashboard_settings_ail['max_links_per_post']) : 3;
+            echo '<p>' . sprintf(__('Automated internal linking is enabled. Up to %d relevant links may be added when this post is saved.', 'ai-powered-post-updater'), $max_links) . '</p>';
+        } else {
+            echo '<p>' . __('Automated internal linking is currently disabled in global settings.', 'ai-powered-post-updater') . '</p>';
+        }
+
         echo '</div>'; // .aipu-meta-box-container
     }
 
@@ -226,5 +265,31 @@ class AIPU_Meta_Box {
              wp_send_json_error(['message' => $result['message'] ?? 'An unknown error occurred during indexing request.']);
          }
      }
+
+    public function handle_ajax_recheck_post_links() {
+        check_ajax_referer('aipu_meta_box_nonce', 'nonce'); // Use existing meta box nonce
+
+        if (!current_user_can('edit_posts')) {
+            wp_send_json_error(['message' => __('Permission denied.', 'ai-powered-post-updater')]);
+            return;
+        }
+
+        $post_id = isset($_POST['post_id']) ? intval($_POST['post_id']) : 0;
+        if (!$post_id) {
+            wp_send_json_error(['message' => __('Error: Post ID missing.', 'ai-powered-post-updater')]);
+            return;
+        }
+
+        // Ensure BLC class is available
+        if (!class_exists('AIPU_Broken_Link_Checker')) {
+            wp_send_json_error(['message' => __('Error: Broken Link Checker module not available.', 'ai-powered-post-updater')]);
+            return;
+        }
+
+        $blc = new AIPU_Broken_Link_Checker();
+        $blc->scan_single_post_and_store_results($post_id); // This function logs internally
+
+        wp_send_json_success(['message' => __('Link scan for this post complete. Refresh page to see updated status if changes were made.', 'ai-powered-post-updater')]);
+    }
 }
 ?>

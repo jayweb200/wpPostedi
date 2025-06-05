@@ -38,4 +38,40 @@ jQuery(document).ready(function($) {
         // For now, it just shows a message.
         // The AIPU_External_Retriever->scan_linked_website(url) would be called via AJAX.
     });
+
+    $('#aipu-recheck-post-links').on('click', function() {
+        var $button = $(this);
+        var $status = $('#aipu-recheck-status');
+        var postId = $(this).data('postid');
+
+        $status.text('Scanning links...').removeClass('error success').addClass('notice notice-warning inline').show();
+        $button.prop('disabled', true);
+
+        $.ajax({
+            url: aipuMetaBox.ajax_url,
+            type: 'POST',
+            data: {
+                action: 'aipu_recheck_post_links_action',
+                nonce: aipuMetaBox.nonce,
+                post_id: postId
+            },
+            success: function(response) {
+                if (response.success) {
+                    $status.text(response.data.message || 'Scan complete. Refresh page to see updates.').removeClass('notice-warning').addClass('success');
+                } else {
+                    $status.text(response.data.message || 'Error during scan.').removeClass('notice-warning').addClass('error');
+                }
+            },
+            error: function(xhr) {
+                $status.text('AJAX error: ' + xhr.statusText).removeClass('notice-warning').addClass('error');
+            },
+            complete: function() {
+                $button.prop('disabled', false);
+                // Hide status message after a few seconds
+                setTimeout(function() {
+                    $status.fadeOut(500, function() { $(this).text('').removeClass('error success notice notice-warning inline').show(); });
+                }, 5000);
+            }
+        });
+    });
 });
